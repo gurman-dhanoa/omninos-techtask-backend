@@ -4,6 +4,9 @@ import { Post } from "../models/post.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Like } from "../models/like.model.js";
+import stripeModule from "stripe"
+import { v4 as uuid } from 'uuid';
+const stripe = stripeModule(process.env.STRIPE_SECRET_KEY);
 
 const uploadPost = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
@@ -166,6 +169,25 @@ const likeStatus = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {status:existingLikeStatus.likeStatus}, "Post like status"));
 });
 
+const paymentHandler = asyncHandler(async(req,res)=>{
+  const {product,token} = req.body;
+  const idempontencyKey = uuid();
+  return stripe.customers.create({
+    email:token.email,
+    source:token.id
+  }).then(customer => {
+    stripe.charges.create({
+      amount: product.price * 100,
+      currency: 'usd',
+      customer: customer.id,
+      receipt_email : token.email,
+      description:`purchase of ${product.name}`,
+    },{idempontencyKey})
+    .then(result => res.status(200).json(result))
+    .catch(err => console.log(err))
+  })
+});
+
 export {
   uploadPost,
   fetchPosts,
@@ -173,4 +195,5 @@ export {
   postDetails,
   likeStatusHandler,
   likeStatus,
+  paymentHandler
 };
