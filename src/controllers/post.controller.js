@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { Post } from "../models/post.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import { Like } from "../models/like.model.js";
 
 const uploadPost = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
@@ -50,18 +51,126 @@ const uploadPost = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, createdPost, "Posted Successfully"));
 });
 
-const fetchPosts = asyncHandler(async(req,res)=>{
-    const posts = await Post.find();
-    return res
-    .status(201)
-    .json(new ApiResponse(200, posts, "All Posts"));
-})
+const fetchPosts = asyncHandler(async (req, res) => {
+  const posts = await Post.find().populate("owner").select("-video");
+  return res.status(201).json(new ApiResponse(200, posts, "All Posts"));
+});
 
-const fetchUserPosts = asyncHandler(async(req,res)=>{
-    const posts = await Post.find({owner:req.user._id});
-    return res
-    .status(201)
-    .json(new ApiResponse(200, posts, "All Posts"));
-})
+const fetchUserPosts = asyncHandler(async (req, res) => {
+  const posts = await Post.find({ owner: req.user._id })
+    .populate("owner")
+    .select("-video");
+  return res.status(201).json(new ApiResponse(200, posts, "All Posts"));
+});
 
-export { uploadPost, fetchPosts, fetchUserPosts };
+const postDetails = asyncHandler(async (req, res) => {
+  const post = await Post.findById(req.params.postId).populate("owner");
+  post.views++;
+  await post.save();
+  return res.status(201).json(new ApiResponse(200, post, "Post Details"));
+});
+
+const likeStatusHandler = asyncHandler(async (req, res) => {
+  const { postId } = req.params;
+  const likeStatus = req.body.likeStatus;
+  const post = await Post.findById(postId);
+
+  if (!post) {
+    throw new ApiError(500, "Post not found");
+  }
+
+  const existingLikeStatus = await Like.findOne({
+    post: postId,
+    user: req.user._id,
+  });
+  console.log(existingLikeStatus);
+  // new review
+  if (!existingLikeStatus) {
+    const newLikeStatus = await Like.create({
+      user: req.user._id,
+      post: postId,
+      likeStatus: likeStatus,
+    });
+
+    if (!newLikeStatus) {
+      throw new ApiError(500, "Something went wrong while posting review");
+    }
+
+    if (likeStatus === true) {
+      post.likes++;
+    } else {
+      post.dislikes++;
+    }
+    await post.save();
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, newLikeStatus, "Post like status Updated"));
+  }
+
+  // existing review
+  const previousStatus = existingLikeStatus.likeStatus;
+  if (likeStatus === null) {
+    const deleteReview = await Like.deleteOne({
+      user: req.user._id,
+      post: postId,
+    });
+
+    if (!deleteReview) {
+      throw new ApiError(500, "Something went wrong while deleting review");
+    }
+    if (previousStatus === true) {
+      post.likes--;
+    } else {
+      post.dislikes--;
+    }
+    await post.save();
+    return res
+      .status(200)
+      .json(new ApiResponse(200, {}, "Post like status Updated"));
+  }
+
+  if (likeStatus !== previousStatus) {
+    existingLikeStatus.likeStatus = likeStatus;
+    await existingLikeStatus.save();
+
+    if (likeStatus === true) {
+      post.dislikes--;
+      post.likes++;
+    } else {
+      post.dislikes++;
+      post.likes--;
+    }
+    await post.save();
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, existingLikeStatus, "Post like status Updated")
+      );
+  }
+});
+
+const likeStatus = asyncHandler(async (req, res) => {
+  const {postId} = req.params;
+  const existingLikeStatus = await Like.findOne({
+    post: postId,
+    user: req.user._id,
+  });
+  if (!existingLikeStatus) {
+    return res
+    .status(200)
+    .json(new ApiResponse(200, {status:null}, "Post like status"));
+  }
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {status:existingLikeStatus.likeStatus}, "Post like status"));
+});
+
+export {
+  uploadPost,
+  fetchPosts,
+  fetchUserPosts,
+  postDetails,
+  likeStatusHandler,
+  likeStatus,
+};

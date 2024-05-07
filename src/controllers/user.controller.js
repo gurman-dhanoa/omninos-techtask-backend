@@ -3,9 +3,6 @@ import {ApiError} from "../utils/ApiError.js"
 import { User} from "../models/user.model.js"
 import {uploadOnCloudinary} from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
-import jwt from "jsonwebtoken"
-import mongoose from "mongoose";
-
 
 const generateAccessToken = async(userId) =>{
     try {
@@ -38,7 +35,6 @@ const registerUser = asyncHandler( async (req, res) => {
     if (existedUser) {
         throw new ApiError(409, "User with email or username already exists")
     }
-
     const avatarLocalPath = req.files?.avatar[0]?.path;
 
     let coverImageLocalPath;
@@ -138,7 +134,7 @@ const logoutUser = asyncHandler(async(req, res) => {
     return res
     .status(200)
     .clearCookie("accessToken", options)
-    .json(new ApiResponse(200, {}, "User logged Out"))
+    .json(new ApiResponse(200, {success:true}, "User logged Out"))
 })
 
 const getCurrentUser = asyncHandler(async(req, res) => {
