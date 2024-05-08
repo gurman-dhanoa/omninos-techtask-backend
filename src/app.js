@@ -2,11 +2,7 @@ import express from "express"
 import cors from "cors"
 import {Errorhandler} from "./middlewares/ErrorHandler.middleware.js"
 import cookieParser from "cookie-parser"
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { value } from "../public/temp/temp.js"
 
 
 const app = express()
@@ -31,7 +27,7 @@ app.get("/", function (req, res) {
 
 app.use(express.json({limit: "5mb"}))
 app.use(express.urlencoded({extended: true, limit: "16kb"}))
-app.use(express.static(__dirname))
+app.use(express.static("public"))
 app.use(cookieParser())
 
 import userRouter from './routes/user.routes.js'
